@@ -2,6 +2,4 @@
 __pycache__/
 train.log
 AI_Assignment2_2026_RL.pdf
-report/*.aux
-report/*.log
-report/*.out
+report/

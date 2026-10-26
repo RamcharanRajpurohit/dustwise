@@ -72,7 +72,6 @@ python evaluate.py    # baselines vs agent on 2025 -> table + results.png
 | `env.py` | `DustWiseEnv` Gymnasium environment, with action masks |
 | `train.py` | MaskablePPO training (logs in `logs/`, models in `models/`) |
 | `evaluate.py` | baselines vs the agent on 2025, plots |
-| `report/` | 2-page report (`report.tex`, built to `report.pdf` with `pdflatex`) |
 
 ## Constants and sources
 
