@@ -23,13 +23,10 @@ class DustWiseEnv(gym.Env):
     """Action 0 = idle, 1-10 = dry brush block i, 11-20 = water wash block i."""
 
     def __init__(self, weather, days=90):
-        self.sun, self.rain, self.dust, self.sun_fc, self.rain_fc = (
-            weather[["sun", "rain", "dust", "sun_fc", "rain_fc"]].to_numpy().T)
-        angle = 2 * np.pi * weather.index.day_of_year.to_numpy() / 365.25
-        self.season = np.c_[1 + np.sin(angle), 1 + np.cos(angle)] / 2  # scaled to [0, 1]
+        self.sun, self.rain, self.dust = weather[["sun", "rain", "dust"]].to_numpy().T
         self.days = days
         self.action_space = gym.spaces.Discrete(1 + 2 * BLOCKS)
-        self.observation_space = gym.spaces.Box(0, np.inf, (2 * BLOCKS + 6,), np.float32)
+        self.observation_space = gym.spaces.Box(0, np.inf, (2 * BLOCKS + 4,), np.float32)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -41,10 +38,9 @@ class DustWiseEnv(gym.Env):
         return self._obs(), {}
 
     def _obs(self):
-        """The agent sees the forecast made a day earlier, not the weather that will happen."""
         t = self.t
-        weather = [self.sun_fc[t] / 7, min(self.rain_fc[t], 12) / RAIN_CLEAN, self.dust[t] / DUST_MEAN / 10]
-        return np.float32([*self.loose * 10, *self.stuck * 10, self.tank / TANK_L, *weather, *self.season[t]])
+        weather = [self.sun[t] / 7, min(self.rain[t], 12) / RAIN_CLEAN, self.dust[t] / DUST_MEAN / 10]
+        return np.float32([*self.loose * 10, *self.stuck * 10, self.tank / TANK_L, *weather])
 
     def step(self, action):
         cost, water = self._clean(int(action))
@@ -82,9 +78,3 @@ class DustWiseEnv(gym.Env):
         self.tank -= WASH_L
         self.loose[block] = self.stuck[block] = 0
         return LABOUR + WASH_L * WATER_PRICE, WASH_L
-
-    def action_masks(self):
-        """Water wash is only allowed when the tank holds enough for one block (read by MaskablePPO)."""
-        mask = np.ones(1 + 2 * BLOCKS, dtype=bool)
-        mask[1 + BLOCKS:] = self.tank >= WASH_L
-        return mask
