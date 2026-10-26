@@ -22,3 +22,11 @@ def load_weather_v2():
     df["rain_fc"] = fc["precipitation_previous_day1"].fillna(df["rain"])
     df.to_csv(CACHE)
     return df
+
+
+if __name__ == "__main__":
+    df = load_weather_v2().loc["2024-01-20":]  # days with a real archived forecast
+    nrmse = ((df.sun - df.sun_fc) ** 2).mean() ** 0.5 / df.sun.mean()
+    heavy, heavy_fc = df.rain >= 6, df.rain_fc >= 6
+    print(f"{len(df)} days. Irradiance: correlation {df.sun.corr(df.sun_fc):.2f}, nRMSE {nrmse:.0%}")
+    print(f"Heavy rain: caught {(heavy & heavy_fc).sum()} of {heavy.sum()} days, {(heavy_fc & ~heavy).sum()} false alarms")

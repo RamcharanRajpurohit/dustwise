@@ -22,7 +22,7 @@ So the agent has to act under genuine uncertainty. Skipping cleaning because "ra
 
 ```bash
 pip install -r requirements.txt
-python -m v2.forecast                       # fetch and cache forecasts -> data/jaisalmer_forecast.csv
+python -m v2.forecast                       # fetch and cache forecasts, print their accuracy
 python -m v2.train ppo 0                    # <dqn|qrdqn|ppo|a2c|maskppo> <seed> [refill L/day]
 xargs -P 8 -L 1 sh -c 'python -m v2.train $0 $1 $2' < v2/runs/jobs.txt   # all 21 runs
 python -m v2.evaluate                       # tables + v2/results_v2.png

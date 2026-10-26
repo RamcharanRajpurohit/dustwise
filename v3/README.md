@@ -1,6 +1,6 @@
 # DustWise v3
 
-v3 is the best agent from a validation study. The study trained on 2022–23 and scored each change on 2024 with real forecasts. The greedy baseline cost 30.86 lakh INR on that year. 2025 was not used to choose anything.
+v3 is the best agent from a validation study. The study trained on 2022–23 and scored each change on 2024 with real forecasts. The greedy baseline cost 30.86 lakh INR on that year. The changes below were chosen on 2024 only; the choice of MaskablePPO itself came from v2's algorithm comparison on 2025.
 
 | Change (MaskablePPO, seed 0) | Cost on 2024 (lakh INR) at 500k → 1M steps |
 |---|---|
@@ -13,13 +13,15 @@ v3 is the best agent from a validation study. The study trained on 2022–23 and
 
 So v3 is v2's MaskablePPO plus the season input and an entropy bonus of 0.01, trained for 1M steps. The extra rain forecasts gained only about 0.1 lakh, which matches the small forecast gain reported by Terhag et al. That gain wasn't worth another API call, so they were left out. DQN became unstable with longer training.
 
+These validation runs were exploratory and are not scripted in the repo. Only the final v3 configuration is.
+
 ¹ H. An, "Reinforcement learning-based dynamic cleaning scheduling framework for solar energy system," arXiv:2603.07518, 2026.
 ² F. Terhag et al., "Optimization of cleaning strategies based on ANN algorithms assessing the benefit of soiling rate forecasts," AIP Conf. Proc. 2126, 220005, 2019.
 
 ## Run (from the repo root)
 
 ```bash
-python -m v3.train 0        # seeds 0, 1, 2; about 1 h each on 1 CPU thread
+python -m v3.train 0        # seeds 0, 1, 2; about 40 min each on 1 CPU thread
 python -m v3.evaluate       # table + v3/results_v3.png
 ```
 
