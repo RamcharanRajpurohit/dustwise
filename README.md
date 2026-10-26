@@ -1,10 +1,10 @@
 # DustWise
 
-Dust cuts solar output in Rajasthan, but washing panels uses scarce water. DustWise trains an RL agent that decides each day which of 10 panel blocks to clean, and whether to dry-brush or water-wash it. It uses real weather, dust and day-ahead forecast data for Jaisalmer.
+Dust cuts solar output in Rajasthan, but washing panels uses scarce water. DustWise trains an RL agent (**MaskablePPO**) that decides each day which of 10 panel blocks to clean, and whether to dry-brush or water-wash it. It uses real weather, dust and day-ahead forecast data for Jaisalmer.
 
-The final agent is **v3: MaskablePPO** (`v3/`). On the unseen 2025 test year it costs **13.00 ± 0.04 lakh INR**, which is **34% cheaper** than the best rule-based baseline (19.63).
+On the unseen 2025 test year the agent costs **13.00 ± 0.04 lakh INR**, which is **34% cheaper** than the best rule-based baseline (19.62).
 
-## RL formulation (final agent, v3)
+## RL formulation
 
 | | |
 |---|---|
@@ -24,62 +24,54 @@ The final agent is **v3: MaskablePPO** (`v3/`). On the unseen 2025 test year it 
 
 **Algorithm:** MaskablePPO (sb3-contrib) with an MLP of 128×128, γ = 0.9 and an entropy bonus of 0.01, trained for 1M steps on 2022-08 to 2024. The test year, 2025, is never seen during training.
 
-**Baselines:** no cleaning; daily rotation with a dry brush; daily rotation with a water wash; greedy (brush the dustiest block, but skip the day if heavy rain is forecast). Greedy is the strongest.
+**Baselines:** no cleaning; daily rotation with a dry brush; daily rotation with a water wash; greedy (brush the dustiest block, but skip the day if heavy rain is forecast).
 
-## Results (2025, unseen, real forecasts, 3 seeds)
+## Results (2025, unseen, real forecasts)
 
 | Policy | Cost (lakh INR) | Energy lost (MWh) | Water (kL) |
 |---|---|---|---|
-| Greedy dry (baseline) | 19.63 | 735 | 0 |
-| v2 DQN | 17.30 ± 0.77 | 632 | 220 |
-| v2 MaskablePPO | 14.18 ± 0.19 | 513 | 204 |
-| **v3 MaskablePPO** | **13.00 ± 0.04** | **467** | **175** |
+| No cleaning | 47.79 | 1912 | 0 |
+| Rotation wash | 25.29 | 961 | 371 |
+| Rotation dry | 19.62 | 732 | 0 |
+| Greedy dry | 19.63 | 735 | 0 |
+| **MaskablePPO (3 seeds)** | **13.00 ± 0.04** | **467** | **175** |
 
-![v3 results](v3/results_v3.png)
+The agent loses 36% less energy than the best baseline and still uses less than half the water of the wash rotation. It idles on about 111 days, brushes on about 205 and washes on about 48. 96% of its washes go to blocks with cemented dust, the only case a brush cannot fix.
 
-## How the project developed
+![results](results.png)
 
-| Version | What changed | 2025 cost (lakh INR) | Details |
-|---|---|---|---|
-| v1 (repo root) | DQN on the env above, with 24 inputs and perfect forecasts | 18.01 (greedy: 19.41) | [below](#v1-dqn-with-perfect-forecasts) |
-| v2 | Real day-ahead forecasts, action masking, five-algorithm comparison, drought study | 14.18 ± 0.19 | [`v2/README.md`](v2/README.md) |
-| v3 | Season input and entropy bonus, chosen on a 2024 validation year | 13.00 ± 0.04 | [`v3/README.md`](v3/README.md) |
+## What we tried, in order
 
-Each version subclasses the previous environment, so the soiling, rain, cleaning and cost dynamics are the same throughout.
+1. **DQN with perfect forecasts.** The agent saw the weather that actually happened. It beat greedy, 18.01 against 19.41 lakh INR.
+2. **Real day-ahead forecasts.** The agent sees the forecast issued 24 h earlier. On 2024–25 it has irradiance correlation 0.89 and caught only 14 of 25 heavy-rain days, so the agent must act under real uncertainty.
+3. **Five algorithms**, 3 seeds each, 500k steps: DQN 17.30, QR-DQN 18.80, PPO 15.39, A2C 16.22 lakh INR. The on-policy methods were better and more stable.
+4. **Action masking (MaskablePPO): 14.18.** Without masks, DQN wasted crew-days trying to wash with an empty tank, badly so when water was scarce.
+5. **Tuning on a 2024 validation year** (trained on 2022–23). Adding the season input and an entropy bonus helped most. Tuned PPO settings from An (2026)¹ and 2–3-day rain forecasts gained less, so they were left out. This is the final agent, 13.00.
+
+The code for the earlier steps is in the git history.
+
+¹ H. An, "Reinforcement learning-based dynamic cleaning scheduling framework for solar energy system," arXiv:2603.07518, 2026.
 
 ## Run
 
-Python 3.12. Run everything from the repo root. The data is already cached in `data/`, and the trained models are in `models/`, `v2/models/` and `v3/models/`, so the evaluate commands work straight away.
+Python 3.12. Run from the repo root. The data is cached in `data/` and the trained agents are in `models/`, so `evaluate.py` works straight away.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# final agent (v3)
-python -m v3.train 0        # seeds 0, 1, 2; about 40 min each on 1 CPU thread
-python -m v3.evaluate       # table + v3/results_v3.png
-
-# v2 and v1
-python -m v2.forecast       # forecast accuracy (fetches forecasts if not cached)
-python -m v2.train maskppo 0
-python -m v2.evaluate       # algorithm comparison, drought study + v2/results_v2.png
-python data.py              # weather and dust summary (fetches if not cached)
-python train.py             # v1 DQN, about 10 min on CPU
-python evaluate.py          # v1 table + results.png
+python data.py        # forecast accuracy (downloads the data if data/jaisalmer.csv is missing)
+python train.py 0     # seeds 0, 1, 2; about 40 min each on CPU -> models/maskppo_s<seed>.zip
+python evaluate.py    # baselines vs agent on 2025 -> table + results.png
 ```
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `data.py` | fetch and cache the Open-Meteo weather and dust data |
-| `env.py` | `DustWiseEnv`, the base Gymnasium environment |
-| `train.py`, `evaluate.py` | v1 DQN training and evaluation |
-| `v2/forecast.py` | fetch and cache the real day-ahead forecasts; print their accuracy |
-| `v2/env_v2.py` | `DustWiseV2`: forecasts, action masks, water supply |
-| `v2/train.py`, `v2/evaluate.py` | five algorithms and the drought study |
-| `v3/env_v3.py` | `DustWiseV3`: adds the season input |
-| `v3/train.py`, `v3/evaluate.py` | final agent training and evaluation |
+| `data.py` | fetch and cache the Open-Meteo weather, dust and forecast data |
+| `env.py` | `DustWiseEnv` Gymnasium environment, with action masks |
+| `train.py` | MaskablePPO training (logs in `logs/`, models in `models/`) |
+| `evaluate.py` | baselines vs the agent on 2025, plots |
 | `report/` | 2-page report (`report.tex`, built to `report.pdf` with `pdflatex`) |
 
 ## Constants and sources
@@ -94,28 +86,13 @@ python evaluate.py          # v1 table + results.png
 
 ## Data
 
-Daily shortwave radiation and precipitation come from the [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5). Hourly dust comes from the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api) (CAMS) and is averaged to daily values. Day-ahead forecasts come from the [Open-Meteo Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api), archived from 2024-01-20. All are for Jaisalmer (26.91 N, 70.91 E), 2022-08-05 to 2025-12-31, and are cached in `data/`.
+Daily shortwave radiation and precipitation come from the [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5). Hourly dust comes from the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api) (CAMS) and is averaged to daily values. Day-ahead forecasts come from the [Open-Meteo Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api), archived from 2024-01-20. All are for Jaisalmer (26.91 N, 70.91 E), 2022-08-05 to 2025-12-31, and are cached in `data/jaisalmer.csv`.
 
 Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0). Dust data from the Copernicus Atmosphere Monitoring Service (CAMS).
-
-## v1: DQN with perfect forecasts
-
-v1 is the code in the repo root. A Stable-Baselines3 DQN (128×128, γ = 0.9, 3-step returns, 500k steps) sees 24 inputs: the same as v3 without the season, and with the weather that actually happened instead of a forecast.
-
-| Policy (2025) | Cost (lakh INR) | Energy lost (MWh) | Water (kL) |
-|---|---|---|---|
-| No cleaning | 47.79 | 1912 | 0 |
-| Rotation dry | 19.62 | 732 | 0 |
-| Rotation wash | 25.29 | 961 | 371 |
-| Greedy dry | 19.41 | 725 | 0 |
-| **DQN** | **18.01** | **644** | 335 |
-
-The DQN is 7% cheaper than the best baseline. Across training seeds 0–3 its 2025 cost was 18.0 ± 0.7 lakh INR, and every seed beat greedy. To change the seed, edit `SEED` in `train.py`.
-
-![v1 results](results.png)
 
 ## Limitations
 
 - Before 2024-01-20 there is no forecast archive, so the training years use the observed weather as the forecast. Only 2024 and 2025 have real forecasts.
 - The dust input is the CAMS value for the same day, not a forecast, so the agent effectively has a perfect one-day dust forecast. The greedy baseline gets the same information.
 - The soiling and cleaning constants come from nearby Indian and desert studies, not measurements from Jaisalmer itself.
+- MaskablePPO itself was picked by comparing algorithms on 2025; only the final additions were chosen on the 2024 validation year.

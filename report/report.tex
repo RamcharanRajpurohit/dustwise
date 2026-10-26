@@ -38,12 +38,10 @@ tariff $\tau=2.5$ INR/kWh, $P=1000$\,kWp and $\mathrm{PR}=0.78$. Labour is 0.20 
 
 \textbf{Episodes} are 90 random consecutive days from 2022-08 to 2024. 2025 is the held-out test year, played as one 364-day episode. Archived forecasts exist only from 2024-01-20, so earlier training days use the observed weather as the forecast; on 2024--25 the real forecast has irradiance correlation 0.89 (nRMSE 13\%) and caught only 14 of 25 heavy-rain days with 18 false alarms. The agent must act under genuine forecast uncertainty.
 
-\section{Algorithms and baselines}
-\textbf{Baselines.} No cleaning; daily rotation with a brush; daily rotation with a wash; and \emph{greedy}: brush the dustiest block unless heavy rain is forecast. Greedy is the strongest rule.
+\section{Algorithm and baselines}
+\textbf{Baselines.} No cleaning; daily rotation with a brush; daily rotation with a wash; and \emph{greedy}: brush the dustiest block unless heavy rain is forecast.
 
-\textbf{Algorithms.} All use Stable-Baselines3~\cite{sb3}, a 128$\times$128 MLP and $\gamma=0.9$ (soiling effects decay within days). We compare DQN (3-step returns), QR-DQN, PPO, A2C and MaskablePPO~\cite{maskppo}, each with 3 seeds and 500k steps. MaskablePPO receives the tank mask so it never wastes a crew-day on an impossible wash.
-
-\textbf{Final agent (v3).} We held out 2024 as a validation year (training on 2022--23) and tested additions to MaskablePPO one at a time. A season input and an entropy bonus of 0.01 helped (2024 cost 19.16$\to$17.55 lakh INR); PPO settings from An~\cite{an} and 2--3-day rain forecasts (suggested by Terhag et al.~\cite{terhag}) helped less. The final agent retrains on 2022--24 for 1M steps.
+\textbf{Algorithm.} MaskablePPO~\cite{maskppo} from Stable-Baselines3~\cite{sb3}, with a 128$\times$128 MLP, $\gamma=0.9$ (soiling effects decay within days) and an entropy bonus of 0.01, trained for 1M steps over 3 seeds. The policy receives the tank mask, so it never wastes a crew-day on an impossible wash. PPO's clipped on-policy updates were more stable here than value-based methods (Section~5).
 
 \section{Results on unseen 2025}
 
@@ -53,45 +51,35 @@ tariff $\tau=2.5$ INR/kWh, $P=1000$\,kWp and $\mathrm{PR}=0.78$. Labour is 0.20 
 \toprule
 Policy & Cost (lakh INR) & Lost MWh & Water kL\\
 \midrule
-No cleaning$^\dagger$ & 47.79 & 1912 & 0\\
-Rotation wash$^\dagger$ & 25.29 & 961 & 371\\
-Rotation brush$^\dagger$ & 19.62 & 732 & 0\\
+No cleaning & 47.79 & 1912 & 0\\
+Rotation wash & 25.29 & 961 & 371\\
+Rotation brush & 19.62 & 732 & 0\\
 Greedy brush & 19.63 & 735 & 0\\
-DQN & 17.30$\pm$0.77 & 632 & 220\\
-QR-DQN & 18.80$\pm$0.97 & 691 & 203\\
-PPO & 15.39$\pm$0.23 & 567 & 165\\
-A2C & 16.22$\pm$0.24 & 604 & 131\\
-MaskablePPO & 14.18$\pm$0.19 & 513 & 204\\
-\textbf{v3 MaskablePPO} & \textbf{13.00$\pm$0.04} & \textbf{467} & \textbf{175}\\
+\textbf{MaskablePPO} & \textbf{13.00$\pm$0.04} & \textbf{467} & \textbf{175}\\
 \bottomrule
 \end{tabular}
-\caption{Total 2025 cost with real forecasts, mean $\pm$ std over 3 seeds. $^\dagger$Forecast-independent rules (from v1, perfect forecast).}
+\caption{Total 2025 cost with real forecasts; the agent is mean $\pm$ std over 3 seeds.}
 \end{table}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.49\textwidth]{v3/results_v3.png}\hfill
-\includegraphics[width=0.49\textwidth,trim=0 0 0 288,clip]{v2/results_v2.png}
-\caption{Left: v3 training curves (3 seeds) and 2025 cost against greedy and v2. Right: drought study, MaskablePPO vs DQN (seed 0), 2025 cost and water used as daily water delivery varies.}
+\includegraphics[width=0.85\textwidth]{results.png}
+\caption{Left: training reward on 90-day episodes, 3 seeds. Right: total 2025 cost of each policy.}
 \end{figure*}
 
-\textbf{Main result.} The v3 agent costs 13.00 lakh INR on 2025, \textbf{34\% less than greedy}, with 36\% less energy lost, and its 3 seeds agree within 0.04. Every RL method beats greedy.
+\textbf{Main result.} The agent costs 13.00 lakh INR on 2025, \textbf{34\% less than the best baseline}, with 36\% less energy lost and less than half the water of the wash rotation. Its 3 seeds agree within 0.04.
 
 \textbf{What it learned.} Unlike greedy, the agent spends about 111 days idle, 205 brushing and 48 washing. 96\% of its washes go to blocks holding cemented dust, the only case a brush cannot fix, so water is used where it is irreplaceable.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth,trim=0 288 0 0,clip]{v2/results_v2.png}
-\caption{Algorithm comparison (500k steps, 1,000\,L/day). Left: training reward, seed 0. Right: 2025 cost, 3 seeds; dashed line is greedy.}
-\end{figure}
+\section{What we tried, in order}
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}
+\item \textbf{DQN with perfect forecasts} (observed weather as forecast): 18.01 vs.\ greedy 19.41.
+\item \textbf{Real day-ahead forecasts}, then five algorithms, 3 seeds, 500k steps: DQN 17.30, QR-DQN 18.80, PPO 15.39, A2C 16.22. On-policy methods were better and more stable.
+\item \textbf{Action masking (MaskablePPO): 14.18.} Without masks DQN wasted crew-days on washes with an empty tank, badly so when water was scarce.
+\item \textbf{Tuning on a 2024 validation year} (training on 2022--23). The season input and entropy bonus helped most (2024 cost 19.16$\to$17.55); PPO settings from An~\cite{an} and 2--3-day rain forecasts (as in Terhag et al.~\cite{terhag}) gained less and were dropped. This gives the final agent, 13.00.
+\end{enumerate}
 
-\textbf{On-policy vs value-based.} PPO, A2C and MaskablePPO beat DQN and QR-DQN and vary less across seeds. In validation, DQN also degraded from 500k to 1M steps (2024 cost 22.17$\to$27.19), while MaskablePPO kept improving.
-
-\textbf{Drought study.} With daily water delivery reduced from 2,000 to 250\,L, both agents shift from washing to brushing. Without masking, DQN wastes 166 of 364 crew-days attempting washes with an empty tank and becomes worse than greedy; MaskablePPO stays below greedy at every supply level.
-
-\textbf{Development.} v1 (DQN, perfect forecasts, 18.01) $\to$ v2 (real forecasts, masking, MaskablePPO, 14.18) $\to$ v3 (season, entropy bonus, 13.00); each version subclasses the previous environment.
-
-\textbf{Limitations.} Same-day dust is observed, not forecast; training years before 2024 lack real forecasts; soiling constants come from nearby studies rather than Jaisalmer measurements; and MaskablePPO itself was selected on the 2025 comparison, though v3's additions were selected on 2024 only.
+\textbf{Limitations.} Same-day dust is observed, not forecast; training years before 2024 lack real forecasts; soiling constants come from nearby studies rather than Jaisalmer measurements; and MaskablePPO itself was picked on the 2025 comparison, though the final additions were chosen on 2024 only.
 
 \footnotesize
 \begin{thebibliography}{9}\setlength{\itemsep}{0pt}
