@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+train.log
+v2/runs/*.log
+AI_Assignment2_2026_RL.pdf
+report/*.aux
+report/*.log
+report/*.out
