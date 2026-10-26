@@ -80,6 +80,7 @@ python evaluate.py          # v1 table + results.png
 | `v2/train.py`, `v2/evaluate.py` | five algorithms and the drought study |
 | `v3/env_v3.py` | `DustWiseV3`: adds the season input |
 | `v3/train.py`, `v3/evaluate.py` | final agent training and evaluation |
+| `report/` | 2-page report (`report.tex`, built to `report.pdf` with `pdflatex`) |
 
 ## Constants and sources
 
